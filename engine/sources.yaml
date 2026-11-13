@@ -1,0 +1,148 @@
+# Data sources the engine reads. Each entry becomes one row of meta.json datasets.
+# `python -m engine download` fetches them into data/raw/<id>/ and records each
+# file's URL, edition, date and checksum in data/raw/MANIFEST.json.
+#
+# fetch.kind:
+#   file      one URL, saved as-is
+#   dbnomics  series from the DBnomics mirror of OECD SDMX (oecd.org blocks scripts)
+#   eurostat  one query to the Eurostat dissemination API
+#   manual    downloaded by hand and saved at fetch.file
+#
+# Every source must allow publishing figures derived from it. UN Comtrade's
+# usage agreement bars automated downloading and publication without written
+# permission (checked 2026-11-10), so trade data comes from CEPII BACI, which
+# is built on Comtrade and released under an open licence.
+
+http:
+  timeout_seconds: 300
+  dbnomics_api: https://api.db.nomics.world/v22
+  dbnomics_page_size: 1000
+  eurostat_api: https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data
+
+sources:
+  - id: oecd_icio
+    name: Inter-Country Input-Output tables (ICIO)
+    publisher: OECD
+    edition: 2025 edition, revision of January 2026
+    license: CC BY 4.0
+    page: https://www.oecd.org/en/data/datasets/inter-country-input-output-tables.html
+    # The regular ("SML") table: 81 economies x 50 industries, China and Mexico not
+    # split. One CSV per year, 2016 to 2022, each about 90 MB with 4,538 columns.
+    # The engine reads the year it needs straight from the zip.
+    fetch:
+      kind: manual  # the OECD page blocks scripts
+      file: 2016-2022_SML.zip
+      instructions: >-
+        Open the page above, find the 2025 release of the regular ICIO tables,
+        download the 2016-2022 zip and save it, unopened, at the path below.
+
+  - id: oecd_ghgfp
+    name: Greenhouse Gas Footprints (GHGFP), principal indicators, production-based emissions
+    publisher: OECD
+    edition: 2025 edition
+    license: CC BY 4.0
+    page: https://data-explorer.oecd.org/?tm=DF_ICIO_GHG_MAIN_2025
+    fetch:
+      kind: dbnomics
+      dataset: OECD/DSD_ICIO_GHG_MAIN_2025@DF_ICIO_GHG_MAIN_2025
+      dimensions:
+        MEASURE: [PROD_GHG]
+        UNIT_MEASURE: [T_CO2E]
+      file: series.json
+
+  - id: oecd_tim
+    name: Trade in Employment (TiM), employment by industry
+    publisher: OECD
+    edition: 2025 edition
+    license: CC BY 4.0
+    page: https://www.oecd.org/en/data/datasets/trade-in-employment.html
+    fetch:
+      kind: dbnomics
+      dataset: OECD/DSD_TIM_2025@DF_TIM_2025
+      dimensions:
+        MEASURE: [EMPN]
+        REF_AREA: [AUT, CHE]
+      file: series.json
+
+  - id: eurostat_employment
+    name: Employment by industry, persons and hours worked (nama_10_a64_e)
+    publisher: Eurostat
+    edition: online table nama_10_a64_e
+    license: CC BY 4.0
+    page: https://ec.europa.eu/eurostat/databrowser/view/nama_10_a64_e/default/table
+    fetch:
+      kind: eurostat
+      dataset: nama_10_a64_e
+      params:
+        geo: [AT, CH]
+        unit: [THS_PER, THS_HW]
+        na_item: [EMP_DC]
+      file: nama_10_a64_e.json
+
+  - id: eurostat_fx
+    name: Euro exchange rates, annual averages (ert_bil_eur_a)
+    publisher: Eurostat
+    edition: online table ert_bil_eur_a
+    license: CC BY 4.0
+    page: https://ec.europa.eu/eurostat/databrowser/view/ert_bil_eur_a/default/table
+    fetch:
+      kind: eurostat
+      dataset: ert_bil_eur_a
+      params:
+        currency: [USD, CHF]
+        statinfo: [AVG]
+      file: ert_bil_eur_a.json
+
+  - id: eurostat_deflator
+    name: GDP price index, national currency, 2015 = 100 (nama_10_gdp)
+    publisher: Eurostat
+    edition: online table nama_10_gdp
+    license: CC BY 4.0
+    page: https://ec.europa.eu/eurostat/databrowser/view/nama_10_gdp/default/table
+    fetch:
+      kind: eurostat
+      dataset: nama_10_gdp
+      params:
+        geo: [AT, CH]
+        na_item: [B1GQ]
+        unit: [PD15_NAC]
+      file: nama_10_gdp.json
+
+  - id: cepii_baci
+    name: BACI, international trade by product, reconciled from UN Comtrade
+    publisher: CEPII
+    edition: V202601 (released January 2026), HS 2022
+    license: Etalab Open Licence 2.0
+    page: https://www.cepii.fr/CEPII/en/bdd_modele/bdd_modele_item.asp?id=37
+    # Gives the import origins of it_hardware, because the table's C26 also holds
+    # instruments and watches. "Any use is authorized, provided the source is
+    # mentioned" (CEPII, read 2026-11-10). Trade inside the EU is recorded by
+    # the member state that ships the goods, so some Asian kit bought by
+    # Austria appears as Dutch or German.
+    fetch:
+      kind: file
+      url: https://www.cepii.fr/DATA_DOWNLOAD/baci/data/BACI_HS22_V202601.zip
+      file: BACI_HS22_V202601.zip
+      instructions: >-
+        If the link stops working, download the HS22 release from the page
+        above and save the zip, unopened, at the path below.
+
+  - id: oecd_tiva
+    name: Trade in Value Added (TiVA), principal indicators, domestic value added in gross exports
+    publisher: OECD
+    edition: 2025 edition
+    license: CC BY 4.0
+    page: https://data-explorer.oecd.org/?tm=TIVA
+    # DBnomics lists this dataflow (DSD_TIVA_MAINSH@DF_MAINSH) but holds no data for it.
+    # The download holds every country, industry and year (about 217,000 rows).
+    # The engine keeps MEASURE EXGR_DVA, UNIT_MEASURE PT_EXGR, ACTIVITY _T,
+    # COUNTERPART_AREA W, REF_AREA AUT and CHE.
+    fetch:
+      kind: manual
+      file: EXGR_DVASH.zip
+      instructions: >-
+        In the OECD Data Explorer, open "Trade in Value Added (TiVA) 2025 edition:
+        Principal Indicators, shares", measure "Domestic value added in gross
+        exports", and download it as CSV. The download ignores the filters and
+        holds every country; that is expected. Save the zip, unopened, at the
+        path below.

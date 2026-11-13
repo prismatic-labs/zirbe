@@ -1,0 +1,256 @@
+# How the engine reads the source tables and maps their codes onto Zirbe's
+# groups and categories. Numbers allowed in code come from this file,
+# assumptions/assumptions.yaml or the data.
+
+table:
+  source_id: oecd_icio
+  # One CSV per year inside the zip. The engine uses the latest year present.
+  member: "{year}_SML.csv"
+  # Row labels after the country x industry block, in this order.
+  tail_rows: { taxes: TLS, value_added: VA, output: OUT }
+  output_column: OUT
+  final_uses: [HFCE, NPISH, GGFC, GFCF, INVNT, DPABR]
+  # Each column must balance (purchases + taxes + value added = output) and each
+  # row too (sales to industries + final use = output). A gap passes if it is
+  # under either limit. Measured on the 2022 table (2025 edition): columns miss
+  # by at most 0.007% of output (China, real estate). Rows L and T in 13
+  # economies miss by exactly 0.0116%, which is in the published table itself.
+  # The model uses the output row, so those row gaps do not reach it. Small
+  # industries are covered by the absolute limit, since every cell is rounded
+  # to 4 decimals.
+  balance_tolerance: { usd_million: 0.5, share_of_output: 0.0002 }
+
+# ICIO economy -> country group. Membership as in the table year (2022), so
+# the UK is outside the EU. Hong Kong (HKG) is its own economy in the table
+# and goes to ROW; CN is mainland China. Every economy not listed is ROW.
+country_groups:
+  AT: [AUT]
+  CH: [CHE]
+  DE: [DEU]
+  IT: [ITA]
+  FR: [FRA]
+  EU_OTHER: [BEL, BGR, CYP, CZE, DNK, ESP, EST, FIN, GRC, HRV, HUN, IRL, LTU,
+             LUX, LVA, MLT, NLD, POL, PRT, ROU, SVK, SVN, SWE]
+  UK: [GBR]
+  US: [USA]
+  CN: [CHN]
+  TW: [TWN]
+  KR: [KOR]
+  JP: [JPN]
+  ROW: []
+
+purchasers:
+  AT: AUT
+  CH: CHE
+
+# Trade data for import origins (it_hardware): CEPII BACI, one CSV per year
+# inside the zip, values in thousand USD. Exporters are matched to the table's
+# economies on ISO alpha-3 codes; those the table does not have go to ROW.
+trade:
+  source_id: cepii_baci
+  member: "BACI_HS22_Y{year}_*.csv"
+  country_codes: "country_codes_*.csv"
+  products: [847150, 847170, 851762]  # servers, storage units, network switches and routers (HS 2022)
+  importers: { AUT: 40, CHE: 757 }    # BACI keeps Comtrade's country codes
+  value_unit: 1000                    # USD per unit
+  read_chunk_rows: 2000000            # rows read at a time, to keep memory low
+  partners:
+    aliases: { S19: TWN }  # Taiwan appears as "Other Asia, nes" (S19)
+    fallback_economy: ROW
+
+# Where the demand vector y of each phase comes from (docs/METHOD.md).
+demand:
+  capital: { kind: final_use, code: GFCF }      # the purchaser's gross fixed capital formation
+  operating: { kind: industry, code: J62_63 }   # the purchaser's IT services industry, intermediate purchases
+
+# Spend category -> phase and the table's product (industry) codes.
+categories:
+  # payer: who buys it when the site is let to a tenant. The tenant brings its
+  # own servers, storage and network kit; everything else is the building's.
+  construction:  { phase: capital, payer: building,   products: [F] }
+  electrical:    { phase: capital, payer: building,   products: [C27] }
+  cooling:       { phase: capital, payer: building,   products: [C28] }
+  # C26 also holds instruments and watches, which dominate it in both
+  # countries. For servers, storage and network kit the domestic share comes
+  # from an assumption (id + ".at" or ".ch") and the import origins from trade
+  # data. The fingerprints still use the table's C26 industries.
+  it_hardware:
+    phase: capital
+    payer: tenant
+    products: [C26]
+    domestic_share: { assumption: it_hardware.domestic_share }
+    import_origins: { source_id: cepii_baci }
+  engineering:   { phase: capital, payer: building,   products: [M] }
+  # Its carbon comes only from MWh times the grid factor, so its fingerprint
+  # carries none (no double counting).
+  electricity:   { phase: operating, payer: building, products: [D], embodied_carbon: false }
+  # The table has no separate C33 (repair and installation): it sits in
+  # C31T33 with furniture and other manufacturing. Uses C31T33 and N, weighted
+  # by the purchaser's own purchases.
+  maintenance:   { phase: operating, payer: building, products: [C31T33, N] }
+  # Capital and upkeep together.
+  heat_recovery: { phase: capital, payer: building,   products: [C28] }
+  # Payroll is the operator's own value added; it has no products.
+  staff:         { phase: operating, payer: building, products: [] }
+
+# Industry groups of the domestic view, in contract order. Every industry not
+# listed is "other". Mining of energy (coal, oil, gas) sits in energy, other
+# mining in metals_mining; telecoms (J61) sit in other.
+industry_groups:
+  construction: [F]
+  electrical_machinery: [C27, C28]
+  electronics: [C26]
+  metals_mining: [B07, B08, B09, C24A, C24B, C25]
+  energy: [B05, B06, C19, D]
+  transport_logistics: [H49, H50, H51, H52, H53]
+  trade: [G]
+  business_services: [M, N]
+  it_services: [J62_63]
+  other: []
+
+satellites:
+  emissions:
+    source_id: oecd_ghgfp
+    # Million tonnes CO2e. Checked 2026-11-10: the 2022 world total is 48,741
+    # (global inventories give about 50 Gt) and the US 6,306 (its inventory
+    # about 6.3 Gt). Household emissions (HH) are not tied to production and
+    # are left out.
+    unit: 1.0e+9  # kg per unit
+    aliases: { C24A: C241_2431, C24B: C242_2432, C302T309: C30X301 }
+    # GHGFP has no ROW economy: it is the world (W) minus every other economy,
+    # industry by industry. A remainder below minus this share of the world
+    # total is an error; smaller gaps are set to zero.
+    rest_of_world: { economy: ROW, from: W, tolerance_share: 0.001 }
+  employment:
+    source_id: oecd_tim
+    # Thousands of persons. Checked 2026-11-10 against Eurostat: Austria 4,684
+    # (Eurostat 4,690) and Switzerland 5,185 (5,185) in 2022.
+    unit: 1000  # persons per unit
+    total_code: _T
+    aliases: { C24A: C241_2431, C24B: C242_2432 }
+
+# The table is in USD million of its reference year. Fingerprints are per EUR
+# of the price year. Per purchaser, one EUR of the price year is worth
+#   (national currency per EUR, price year) / (GDP deflator, price year over table year)
+#   x (USD per EUR) / (national currency per EUR), both in the table year
+# table dollars. Price year 2025, GDP deflator.
+prices:
+  year: 2025
+  fx: { source_id: eurostat_fx, usd: USD }
+  deflator: { source_id: eurostat_deflator }
+  purchasers:
+    AT: { currency: EUR, geo: AT }
+    CH: { currency: CHF, geo: CH }
+
+units:
+  table_currency: 1.0e+6  # the table's unit, USD million, in USD
+  jobs_per: 1.0e+6        # jobs are per million EUR
+  hours_per_year: 8760
+
+# Rounding of every number written to data/out/, so the build is the same
+# byte for byte on any machine. Twelve decimals keeps check 3 (1e-9) safe.
+output:
+  decimals: 12
+
+# Data checks.
+checks:
+  fingerprints:
+    va_plus_tax: 0.005  # check 1: value added plus taxes is 1.00 within 0.5%
+    tiers: 1.0e-6       # check 2: tiers sum to the totals
+    flows: 1.0e-9       # check 3: tier n+1 output equals tier n purchases
+  employment:
+    source_id: eurostat_employment
+    select: { unit: THS_PER, nace_r2: TOTAL }  # all industries, thousands of persons
+    unit: 1000  # persons per unit
+    tolerance_share: 0.02  # TiM's total employment against Eurostat's
+  tiva:
+    source_id: oecd_tiva
+    member: EXGR_DVASH.csv
+    filter: { MEASURE: EXGR_DVA, UNIT_MEASURE: PT_EXGR, ACTIVITY: _T, COUNTERPART_AREA: W, FREQ: A }
+    tolerance_pp: 2
+
+# The page's name and tagline, and the English fallback labels written to
+# meta.json. The page shows the strings in web/src/i18n/en.json.
+meta:
+  version: "0.1.0"
+  name: Zirbe
+  tagline: Follow the Euro
+  sliders: [electrical, cooling, it_hardware]
+  country_groups:
+    AT: Austria
+    CH: Switzerland
+    DE: Germany
+    IT: Italy
+    FR: France
+    EU_OTHER: Other EU countries
+    UK: United Kingdom
+    US: United States
+    CN: China
+    TW: Taiwan
+    KR: South Korea
+    JP: Japan
+    ROW: Rest of the world
+  industry_groups:
+    construction: Construction
+    electrical_machinery: Electrical equipment and machinery
+    electronics: Electronics
+    metals_mining: Metals and mining
+    energy: Energy
+    transport_logistics: Transport and logistics
+    trade: Wholesale and retail trade
+    business_services: Engineering and business services
+    it_services: IT services
+    other: Other
+  categories:
+    construction: Construction
+    electrical: Electrical systems
+    cooling: Cooling
+    it_hardware: IT hardware
+    engineering: Engineering and design
+    electricity: Electricity
+    maintenance: Maintenance
+    heat_recovery: Heat recovery
+    staff: Staff
+
+# The six sites, with city-centre coordinates. heat_available
+# says whether a district heating network that could take data centre heat is
+# in place (checked 2026-11-10). Whether a given plot can connect is a
+# site-by-site question; the method page says so.
+#   Vienna: Wien Energie, a network of over 1,300 km. Linz: LINZ AG.
+#   Innsbruck: IKB sells district heat, and a line already brings industrial
+#   waste heat from Wattens. Zurich: city networks (Stadt Zurich energy map).
+#   Geneva: SIG networks, including GeniLac.
+#   Lugano: AIL runs only small networks; the main new network is being built
+#   under the energy plan of July 2026, so no network yet for a site this size.
+# Cooling design of each archetype; it picks the paired cost shares and the
+# liquid cooling premium.
+archetypes:
+  ai:    { cooling: liquid }
+  cloud: { cooling: air }
+
+sites:
+  vienna:    { label: Vienna,    country: AT, lat: 48.2082, lon: 16.3738, heat_available: true }
+  innsbruck: { label: Innsbruck, country: AT, lat: 47.2692, lon: 11.4041, heat_available: true }
+  linz:      { label: Linz,      country: AT, lat: 48.3069, lon: 14.2858, heat_available: true }
+  zurich:    { label: Zurich,    country: CH, lat: 47.3769, lon: 8.5417,  heat_available: true }
+  geneva:    { label: Geneva,    country: CH, lat: 46.2044, lon: 6.1432,  heat_available: true }
+  lugano:    { label: Lugano,    country: CH, lat: 46.0037, lon: 8.9511,  heat_available: false }
+
+# The 20-year schedule. Years count from 1.
+schedule:
+  build_years: [1, 2]   # construction, electrical, cooling, engineering; year 1 takes build_share_year1
+  # The first IT fit-out comes at the start of year 3, as operations begin, so
+  # year 2 shows the build alone: the construction view. Refreshes follow every R years.
+  first_fit_year: 3
+  heat_capex_year: 3    # heat pumps and connection go in with the first fit-out
+  operations_from: 3    # electricity, maintenance, staff and heat from year 3
+  # Payroll is the operator's own value added at home.
+  staff_domestic_value_added: 1.0
+  # The scenario sets behind the band: for each assumption, the low_impact set
+  # takes whichever of its low or high value gives the lower headline at year
+  # 20 (heat recovery on where a network exists), and high_impact the other.
+  # An assumption that does not move the headline stays central in all three.
+  # This is a stress test of every assumption at once, not a likely range; the
+  # method page says so. Linked choices (such as the electrical and mechanical
+  # shares of one cooling design) are single assumptions so they move together.
+  scenario_year: 20

@@ -1,0 +1,6 @@
+# Tool settings only. Dependencies are pinned in requirements.txt.
+
+[tool.pytest.ini_options]
+testpaths = ["engine/tests"]
+pythonpath = ["."]
+addopts = "-ra --strict-markers"

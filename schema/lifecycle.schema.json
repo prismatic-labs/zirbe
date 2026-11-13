@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:zirbe:schema:lifecycle",
+  "title": "Lifecycle",
+  "description": "data/out/lifecycle.json. One Schedule per site, archetype and scenario, per MW of IT load, EUR at the price year, years 1 to 20.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["vienna", "innsbruck", "linz", "zurich", "geneva", "lugano"],
+  "properties": {
+    "vienna": { "$ref": "#/$defs/ByArchetype" },
+    "innsbruck": { "$ref": "#/$defs/ByArchetype" },
+    "linz": { "$ref": "#/$defs/ByArchetype" },
+    "zurich": { "$ref": "#/$defs/ByArchetype" },
+    "geneva": { "$ref": "#/$defs/ByArchetype" },
+    "lugano": { "$ref": "#/$defs/ByArchetype" }
+  },
+  "$defs": {
+    "CategoryId": {
+      "enum": ["construction", "electrical", "cooling", "it_hardware", "engineering", "electricity", "maintenance", "heat_recovery", "staff"]
+    },
+    "SiteId": { "enum": ["vienna", "innsbruck", "linz", "zurich", "geneva", "lugano"] },
+    "ArchetypeId": { "enum": ["ai", "cloud"] },
+    "ScenarioId": { "enum": ["low_impact", "central", "high_impact"] },
+    "SourceId": {
+      "description": "An Assumption.id in assumptions.json, or the id of a data source.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$"
+    },
+    "SourceIds": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/SourceId" }
+    },
+    "Share": { "type": "number", "minimum": 0, "maximum": 1 },
+    "NonNegative": { "type": "number", "minimum": 0 },
+    "Series20": {
+      "description": "Exactly 20 values, years 1 to 20.",
+      "type": "array",
+      "minItems": 20,
+      "maxItems": 20,
+      "items": { "$ref": "#/$defs/NonNegative" }
+    },
+    "Spend": {
+      "description": "Record<CategoryId, Series20>. EUR per MW of IT load. staff is payroll.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["construction", "electrical", "cooling", "it_hardware", "engineering", "electricity", "maintenance", "heat_recovery", "staff"],
+      "properties": {
+        "construction": { "$ref": "#/$defs/Series20" },
+        "electrical": { "$ref": "#/$defs/Series20" },
+        "cooling": { "$ref": "#/$defs/Series20" },
+        "it_hardware": { "$ref": "#/$defs/Series20" },
+        "engineering": { "$ref": "#/$defs/Series20" },
+        "electricity": { "$ref": "#/$defs/Series20" },
+        "maintenance": { "$ref": "#/$defs/Series20" },
+        "heat_recovery": { "$ref": "#/$defs/Series20" },
+        "staff": { "$ref": "#/$defs/Series20" }
+      }
+    },
+    "Milestone": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["year", "key"],
+      "properties": {
+        "year": { "type": "integer", "minimum": 1, "maximum": 20 },
+        "key": { "enum": ["build", "first_fit", "it_refresh", "midlife_refresh"] }
+      }
+    },
+    "Schedule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "spend",
+        "electricity_mwh",
+        "heat_delivered_mwh",
+        "heat_pump_mwh",
+        "heat_pump_spend",
+        "staff_jobs",
+        "grid_kgco2e_per_mwh",
+        "contract_kgco2e_per_mwh",
+        "heat_displaced_kgco2e_per_mwh",
+        "cross_border_payroll_share",
+        "milestones",
+        "source_ids"
+      ],
+      "properties": {
+        "spend": { "$ref": "#/$defs/Spend" },
+        "electricity_mwh": { "$ref": "#/$defs/Series20" },
+        "heat_delivered_mwh": { "description": "Used only when the heat switch is on.", "$ref": "#/$defs/Series20" },
+        "heat_pump_mwh": { "description": "Extra electricity, heat switch on.", "$ref": "#/$defs/Series20" },
+        "heat_pump_spend": { "description": "EUR for that electricity, heat switch on. The page adds it to electricity spend, so it uses the electricity fingerprint.", "$ref": "#/$defs/Series20" },
+        "staff_jobs": { "description": "Operator staff, persons employed.", "$ref": "#/$defs/Series20" },
+        "grid_kgco2e_per_mwh": { "description": "Location-based, life-cycle, consumption mix.", "$ref": "#/$defs/NonNegative" },
+        "contract_kgco2e_per_mwh": { "description": "Market-based renewable contract.", "$ref": "#/$defs/NonNegative" },
+        "heat_displaced_kgco2e_per_mwh": { "$ref": "#/$defs/NonNegative" },
+        "cross_border_payroll_share": { "$ref": "#/$defs/Share" },
+        "milestones": { "type": "array", "items": { "$ref": "#/$defs/Milestone" } },
+        "source_ids": { "$ref": "#/$defs/SourceIds" }
+      }
+    },
+    "ByScenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["low_impact", "central", "high_impact"],
+      "properties": {
+        "low_impact": { "$ref": "#/$defs/Schedule" },
+        "central": { "$ref": "#/$defs/Schedule" },
+        "high_impact": { "$ref": "#/$defs/Schedule" }
+      }
+    },
+    "ByArchetype": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ai", "cloud"],
+      "properties": {
+        "ai": { "$ref": "#/$defs/ByScenario" },
+        "cloud": { "$ref": "#/$defs/ByScenario" }
+      }
+    }
+  }
+}

@@ -1,0 +1,224 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:zirbe:schema:meta",
+  "title": "Meta",
+  "description": "data/out/meta.json. Names, the economic table, the price year, the exchange rate, and the ordered lists the page iterates over.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "generated_at",
+    "fixture",
+    "name",
+    "tagline",
+    "table",
+    "datasets",
+    "price_year",
+    "fx_eur_chf",
+    "tiers",
+    "country_groups",
+    "industry_groups",
+    "categories",
+    "sites"
+  ],
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "generated_at": {
+      "description": "ISO 8601 with a time zone. Derived from the inputs so the build stays byte-for-byte deterministic.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "fixture": { "description": "true for fake data", "type": "boolean" },
+    "name": { "$ref": "#/$defs/Label" },
+    "tagline": { "$ref": "#/$defs/Label" },
+    "table": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "edition", "reference_year", "prices", "source_id"],
+      "properties": {
+        "name": { "$ref": "#/$defs/Label" },
+        "edition": { "$ref": "#/$defs/Label" },
+        "reference_year": { "type": "integer" },
+        "prices": { "const": "basic" },
+        "source_id": { "description": "The table's entry in datasets.", "$ref": "#/$defs/SourceId" }
+      }
+    },
+    "datasets": {
+      "description": "Every data source the engine reads. Ids never overlap with assumption ids.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/DatasetEntry" }
+    },
+    "price_year": { "type": "integer" },
+    "fx_eur_chf": {
+      "description": "1 EUR = value CHF",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "source_id"],
+      "properties": {
+        "value": { "type": "number", "exclusiveMinimum": 0 },
+        "source_id": { "$ref": "#/$defs/SourceId" }
+      }
+    },
+    "tiers": {
+      "description": "TierId[]. Fixed to the five tiers every Fingerprint carries, in order.",
+      "const": ["0", "1", "2", "3", "4+"]
+    },
+    "country_groups": {
+      "description": "All thirteen groups, in contract order.",
+      "type": "array",
+      "minItems": 13,
+      "items": false,
+      "prefixItems": [
+        { "$ref": "#/$defs/CountryGroupEntry", "properties": { "id": { "const": "AT" } } },
+        { "$ref": "#/$defs/CountryGroupEntry", "properties": { "id": { "const": "CH" } } },
+        { "$ref": "#/$defs/CountryGroupEntry", "properties": { "id": { "const": "DE" } } },
+        { "$ref": "#/$defs/CountryGroupEntry", "properties": { "id": { "const": "IT" } } },
+        { "$ref": "#/$defs/CountryGroupEntry", "properties": { "id": { "const": "FR" } } },
+        { "$ref": "#/$defs/CountryGroupEntry", "properties": { "id": { "const": "EU_OTHER" } } },
+        { "$ref": "#/$defs/CountryGroupEntry", "properties": { "id": { "const": "UK" } } },
+        { "$ref": "#/$defs/CountryGroupEntry", "properties": { "id": { "const": "US" } } },
+        { "$ref": "#/$defs/CountryGroupEntry", "properties": { "id": { "const": "CN" } } },
+        { "$ref": "#/$defs/CountryGroupEntry", "properties": { "id": { "const": "TW" } } },
+        { "$ref": "#/$defs/CountryGroupEntry", "properties": { "id": { "const": "KR" } } },
+        { "$ref": "#/$defs/CountryGroupEntry", "properties": { "id": { "const": "JP" } } },
+        { "$ref": "#/$defs/CountryGroupEntry", "properties": { "id": { "const": "ROW" } } }
+      ]
+    },
+    "industry_groups": {
+      "description": "All ten domestic industry groups, in contract order. The ids are the keys of Fingerprint.va_domestic_by_industry.",
+      "type": "array",
+      "minItems": 10,
+      "items": false,
+      "prefixItems": [
+        { "$ref": "#/$defs/IndustryGroupEntry", "properties": { "id": { "const": "construction" } } },
+        { "$ref": "#/$defs/IndustryGroupEntry", "properties": { "id": { "const": "electrical_machinery" } } },
+        { "$ref": "#/$defs/IndustryGroupEntry", "properties": { "id": { "const": "electronics" } } },
+        { "$ref": "#/$defs/IndustryGroupEntry", "properties": { "id": { "const": "metals_mining" } } },
+        { "$ref": "#/$defs/IndustryGroupEntry", "properties": { "id": { "const": "energy" } } },
+        { "$ref": "#/$defs/IndustryGroupEntry", "properties": { "id": { "const": "transport_logistics" } } },
+        { "$ref": "#/$defs/IndustryGroupEntry", "properties": { "id": { "const": "trade" } } },
+        { "$ref": "#/$defs/IndustryGroupEntry", "properties": { "id": { "const": "business_services" } } },
+        { "$ref": "#/$defs/IndustryGroupEntry", "properties": { "id": { "const": "it_services" } } },
+        { "$ref": "#/$defs/IndustryGroupEntry", "properties": { "id": { "const": "other" } } }
+      ]
+    },
+    "categories": {
+      "description": "All nine spend categories, in contract order. has_slider is fixed (electrical, cooling, it_hardware). phase comes from engine/mappings.yaml.",
+      "type": "array",
+      "minItems": 9,
+      "items": false,
+      "prefixItems": [
+        { "$ref": "#/$defs/CategoryEntry", "properties": { "id": { "const": "construction" }, "has_slider": { "const": false } } },
+        { "$ref": "#/$defs/CategoryEntry", "properties": { "id": { "const": "electrical" }, "has_slider": { "const": true } } },
+        { "$ref": "#/$defs/CategoryEntry", "properties": { "id": { "const": "cooling" }, "has_slider": { "const": true } } },
+        { "$ref": "#/$defs/CategoryEntry", "properties": { "id": { "const": "it_hardware" }, "has_slider": { "const": true } } },
+        { "$ref": "#/$defs/CategoryEntry", "properties": { "id": { "const": "engineering" }, "has_slider": { "const": false } } },
+        { "$ref": "#/$defs/CategoryEntry", "properties": { "id": { "const": "electricity" }, "has_slider": { "const": false } } },
+        { "$ref": "#/$defs/CategoryEntry", "properties": { "id": { "const": "maintenance" }, "has_slider": { "const": false } } },
+        { "$ref": "#/$defs/CategoryEntry", "properties": { "id": { "const": "heat_recovery" }, "has_slider": { "const": false } } },
+        { "$ref": "#/$defs/CategoryEntry", "properties": { "id": { "const": "staff" }, "has_slider": { "const": false } } }
+      ]
+    },
+    "sites": {
+      "description": "All six sites, in contract order. Country and default currency are fixed.",
+      "type": "array",
+      "minItems": 6,
+      "items": false,
+      "prefixItems": [
+        { "$ref": "#/$defs/SiteEntry", "properties": { "id": { "const": "vienna" }, "country": { "const": "AT" }, "currency": { "const": "EUR" } } },
+        { "$ref": "#/$defs/SiteEntry", "properties": { "id": { "const": "innsbruck" }, "country": { "const": "AT" }, "currency": { "const": "EUR" } } },
+        { "$ref": "#/$defs/SiteEntry", "properties": { "id": { "const": "linz" }, "country": { "const": "AT" }, "currency": { "const": "EUR" } } },
+        { "$ref": "#/$defs/SiteEntry", "properties": { "id": { "const": "zurich" }, "country": { "const": "CH" }, "currency": { "const": "CHF" } } },
+        { "$ref": "#/$defs/SiteEntry", "properties": { "id": { "const": "geneva" }, "country": { "const": "CH" }, "currency": { "const": "CHF" } } },
+        { "$ref": "#/$defs/SiteEntry", "properties": { "id": { "const": "lugano" }, "country": { "const": "CH" }, "currency": { "const": "CHF" } } }
+      ]
+    }
+  },
+  "$defs": {
+    "CountryGroup": {
+      "enum": ["AT", "CH", "DE", "IT", "FR", "EU_OTHER", "UK", "US", "CN", "TW", "KR", "JP", "ROW"]
+    },
+    "Purchaser": { "enum": ["AT", "CH"] },
+    "CategoryId": {
+      "enum": ["construction", "electrical", "cooling", "it_hardware", "engineering", "electricity", "maintenance", "heat_recovery", "staff"]
+    },
+    "SiteId": { "enum": ["vienna", "innsbruck", "linz", "zurich", "geneva", "lugano"] },
+    "TierId": { "enum": ["0", "1", "2", "3", "4+"] },
+    "IndustryGroupId": {
+      "enum": ["construction", "electrical_machinery", "electronics", "metals_mining", "energy", "transport_logistics", "trade", "business_services", "it_services", "other"]
+    },
+    "SourceId": {
+      "description": "An Assumption.id in assumptions.json, or the id of a data source.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$"
+    },
+    "SourceIds": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/SourceId" }
+    },
+    "Label": { "type": "string", "minLength": 1 },
+    "Date": { "description": "ISO 8601 calendar date, YYYY-MM-DD.", "type": "string", "format": "date" },
+    "DatasetEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "publisher", "edition", "url", "accessed"],
+      "properties": {
+        "id": { "$ref": "#/$defs/SourceId" },
+        "name": { "$ref": "#/$defs/Label" },
+        "publisher": { "$ref": "#/$defs/Label" },
+        "edition": { "$ref": "#/$defs/Label" },
+        "url": { "type": "string", "format": "uri" },
+        "accessed": { "$ref": "#/$defs/Date" },
+        "license": { "$ref": "#/$defs/Label" }
+      }
+    },
+    "CountryGroupEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label"],
+      "properties": {
+        "id": { "$ref": "#/$defs/CountryGroup" },
+        "label": { "$ref": "#/$defs/Label" }
+      }
+    },
+    "IndustryGroupEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label"],
+      "properties": {
+        "id": { "$ref": "#/$defs/IndustryGroupId" },
+        "label": { "$ref": "#/$defs/Label" }
+      }
+    },
+    "CategoryEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "phase", "has_slider", "payer"],
+      "properties": {
+        "id": { "$ref": "#/$defs/CategoryId" },
+        "label": { "$ref": "#/$defs/Label" },
+        "phase": { "enum": ["capital", "operating"] },
+        "has_slider": { "type": "boolean" },
+        "payer": { "enum": ["building", "tenant"] }
+      }
+    },
+    "SiteEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "country", "currency", "lat", "lon", "heat_available", "source_ids"],
+      "properties": {
+        "id": { "$ref": "#/$defs/SiteId" },
+        "label": { "$ref": "#/$defs/Label" },
+        "country": { "$ref": "#/$defs/Purchaser" },
+        "currency": { "enum": ["EUR", "CHF"] },
+        "lat": { "type": "number", "minimum": -90, "maximum": 90 },
+        "lon": { "type": "number", "minimum": -180, "maximum": 180 },
+        "heat_available": { "type": "boolean" },
+        "source_ids": { "$ref": "#/$defs/SourceIds" }
+      }
+    }
+  }
+}

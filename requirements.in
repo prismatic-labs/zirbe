@@ -1,0 +1,9 @@
+# Direct dependencies. requirements.txt is the full pinned set, compiled with:
+#   uv pip compile requirements.in -o requirements.txt --python-version 3.12 --generate-hashes
+numpy==2.5.4
+pandas==3.1.1
+pyarrow==26.0.1
+pyyaml==6.0.3
+jsonschema==4.26.0
+pytest==9.2.0
+requests==2.34.2

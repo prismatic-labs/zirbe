@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:zirbe:schema:fingerprints",
+  "title": "Fingerprints",
+  "description": "data/out/fingerprints.json. For each purchaser and each category except staff, the default domestic share and two fingerprints per 1 EUR of spend: domestic origin and the imported mix.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["AT", "CH"],
+  "properties": {
+    "AT": { "$ref": "#/$defs/PurchaserFingerprints" },
+    "CH": { "$ref": "#/$defs/PurchaserFingerprints" }
+  },
+  "$defs": {
+    "CountryGroup": {
+      "enum": ["AT", "CH", "DE", "IT", "FR", "EU_OTHER", "UK", "US", "CN", "TW", "KR", "JP", "ROW"]
+    },
+    "Purchaser": { "enum": ["AT", "CH"] },
+    "TierId": { "enum": ["0", "1", "2", "3", "4+"] },
+    "IndustryGroupId": {
+      "enum": ["construction", "electrical_machinery", "electronics", "metals_mining", "energy", "transport_logistics", "trade", "business_services", "it_services", "other"]
+    },
+    "SourceId": {
+      "description": "An Assumption.id in assumptions.json, or the id of a data source.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$"
+    },
+    "SourceIds": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/SourceId" }
+    },
+    "Share": { "type": "number", "minimum": 0, "maximum": 1 },
+    "ByCountryGroup": {
+      "description": "Partial<Record<CountryGroup, number>>. A missing key means zero. Value added can be negative in a few industries, so no lower bound.",
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/CountryGroup" },
+      "additionalProperties": { "type": "number" }
+    },
+    "ByCountryGroupNonNegative": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/CountryGroup" },
+      "additionalProperties": { "type": "number", "minimum": 0 }
+    },
+    "Purchases": {
+      "description": "Buyer group at this tier -> seller group at the next tier.",
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/CountryGroup" },
+      "additionalProperties": { "$ref": "#/$defs/ByCountryGroupNonNegative" }
+    },
+    "Tier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tier", "va", "tax"],
+      "properties": {
+        "tier": { "$ref": "#/$defs/TierId" },
+        "output": { "$ref": "#/$defs/ByCountryGroupNonNegative" },
+        "va": { "$ref": "#/$defs/ByCountryGroup" },
+        "tax": { "description": "Net product taxes. Can be negative where subsidies exceed taxes.", "type": "number" },
+        "purchases": { "$ref": "#/$defs/Purchases" }
+      },
+      "if": { "properties": { "tier": { "const": "4+" } } },
+      "then": { "properties": { "output": false, "purchases": false } },
+      "else": { "required": ["output", "purchases"] }
+    },
+    "Fingerprint": {
+      "description": "Per 1 EUR of spend.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tiers", "va", "tax", "va_domestic_by_industry", "co2e_kg", "jobs_domestic_per_meur"],
+      "properties": {
+        "tiers": {
+          "description": "Exactly five entries, tiers 0, 1, 2, 3 and 4+, in that order.",
+          "type": "array",
+          "minItems": 5,
+          "items": false,
+          "prefixItems": [
+            { "$ref": "#/$defs/Tier", "properties": { "tier": { "const": "0" } } },
+            { "$ref": "#/$defs/Tier", "properties": { "tier": { "const": "1" } } },
+            { "$ref": "#/$defs/Tier", "properties": { "tier": { "const": "2" } } },
+            { "$ref": "#/$defs/Tier", "properties": { "tier": { "const": "3" } } },
+            { "$ref": "#/$defs/Tier", "properties": { "tier": { "const": "4+" } } }
+          ]
+        },
+        "va": { "description": "Sum over tiers.", "$ref": "#/$defs/ByCountryGroup" },
+        "tax": { "description": "Sum over tiers.", "type": "number" },
+        "va_domestic_by_industry": {
+          "description": "Value added in the purchaser's own country, by industry group. Every group present, zero allowed.",
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/IndustryGroupId" },
+          "additionalProperties": { "type": "number" },
+          "required": ["construction", "electrical_machinery", "electronics", "metals_mining", "energy", "transport_logistics", "trade", "business_services", "it_services", "other"]
+        },
+        "co2e_kg": { "description": "kg CO2e per EUR, by where it is emitted.", "$ref": "#/$defs/ByCountryGroupNonNegative" },
+        "jobs_domestic_per_meur": { "description": "Job-years per million EUR, counted as persons employed.", "type": "number", "minimum": 0 }
+      }
+    },
+    "CategoryFingerprints": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "domestic_share_low <= default_domestic_share <= domestic_share_high; the engine checks this, since JSON Schema cannot.",
+      "required": ["default_domestic_share", "domestic_share_low", "domestic_share_high", "domestic", "imported", "source_ids"],
+      "properties": {
+        "default_domestic_share": { "$ref": "#/$defs/Share" },
+        "domestic_share_low": { "description": "Used by the low_impact scenario set.", "$ref": "#/$defs/Share" },
+        "domestic_share_high": { "description": "Used by the high_impact scenario set.", "$ref": "#/$defs/Share" },
+        "domestic": { "$ref": "#/$defs/Fingerprint" },
+        "imported": { "$ref": "#/$defs/Fingerprint" },
+        "source_ids": { "$ref": "#/$defs/SourceIds" }
+      }
+    },
+    "PurchaserFingerprints": {
+      "description": "Every category except staff.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["construction", "electrical", "cooling", "it_hardware", "engineering", "electricity", "maintenance", "heat_recovery"],
+      "properties": {
+        "construction": { "$ref": "#/$defs/CategoryFingerprints" },
+        "electrical": { "$ref": "#/$defs/CategoryFingerprints" },
+        "cooling": { "$ref": "#/$defs/CategoryFingerprints" },
+        "it_hardware": { "$ref": "#/$defs/CategoryFingerprints" },
+        "engineering": { "$ref": "#/$defs/CategoryFingerprints" },
+        "electricity": { "$ref": "#/$defs/CategoryFingerprints" },
+        "maintenance": { "$ref": "#/$defs/CategoryFingerprints" },
+        "heat_recovery": { "$ref": "#/$defs/CategoryFingerprints" }
+      }
+    }
+  }
+}

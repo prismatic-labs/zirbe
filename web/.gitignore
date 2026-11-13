@@ -1,0 +1,5 @@
+node_modules
+dist
+public/method-docs
+src/test/fixtures
+.DS_Store

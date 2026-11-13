@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store
+.cursor/
+CLAUDE.md
+SPEC.md
+engine/tests/test_spec_contract.py
+
+# Raw downloads stay local. The manifest (URL, edition, date, checksum) is kept.
+data/raw/*
+!data/raw/MANIFEST.json

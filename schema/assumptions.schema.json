@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:zirbe:schema:assumptions",
+  "title": "Assumptions",
+  "description": "data/out/assumptions.json. Ids must be unique, low <= central <= high, and a source cannot be published after it was read; the engine checks these, since JSON Schema cannot.",
+  "type": "array",
+  "minItems": 1,
+  "items": { "$ref": "#/$defs/Assumption" },
+  "$defs": {
+    "SourceId": {
+      "description": "An Assumption.id in assumptions.json, or the id of a data source.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$"
+    },
+    "Label": { "type": "string", "minLength": 1 },
+    "Date": { "description": "ISO 8601 calendar date, YYYY-MM-DD.", "type": "string", "format": "date" },
+    "Assumption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "unit", "low", "central", "high", "source", "source_accessed", "status"],
+      "properties": {
+        "id": { "$ref": "#/$defs/SourceId" },
+        "label": { "$ref": "#/$defs/Label" },
+        "unit": { "$ref": "#/$defs/Label" },
+        "low": { "type": "number" },
+        "central": { "type": "number" },
+        "high": { "type": "number" },
+        "source": { "$ref": "#/$defs/Label" },
+        "url": { "type": "string", "format": "uri" },
+        "note": { "type": "string" },
+        "source_accessed": { "description": "Date the source was read.", "$ref": "#/$defs/Date" },
+        "source_published": {
+          "description": "Year, year-month or date of the source.",
+          "type": "string",
+          "pattern": "^[0-9]{4}(-[0-9]{2}(-[0-9]{2})?)?$"
+        },
+        "status": { "enum": ["draft", "approved"] },
+        "direction": {
+          "description": "Effect of a higher value on the headline.",
+          "enum": ["raises", "lowers", "neutral"]
+        }
+      }
+    }
+  }
+}
