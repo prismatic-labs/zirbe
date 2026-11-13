@@ -284,6 +284,8 @@ a { color: var(--primary); }
 .currency { display: grid; gap: 0.3rem; justify-items: start; }
 .footprint .carbon-controls { border-top: 1px solid var(--divider); padding-top: 0.45rem; gap: 0.4rem; }
 .totals .panel .section-title { margin-bottom: 0.35rem; }
+.scale-note { margin: 0; font-size: var(--text-small); color: var(--secondary); }
+.totals .panel .scale-note { margin: -0.2rem 0 0.4rem; }
 
 .legend { display: flex; flex-wrap: wrap; gap: 0.3rem 0.9rem; padding: 0; list-style: none; }
 

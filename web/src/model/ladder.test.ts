@@ -7,7 +7,7 @@ import { compute } from "./compute";
 import { energyInAYear } from "./energy";
 import { present } from "./present";
 import { yearsGeometry } from "./spark";
-import { defaultState, withHeat, withLevelYear, withSite } from "./state";
+import { defaultState, withHeat, withSite, withSize, withYear, yearBounds } from "./state";
 
 const webRoot = resolve(fileURLToPath(new URL(".", import.meta.url)), "../..");
 
@@ -61,6 +61,44 @@ describe("ladder copy", () => {
   it("gives every level its own sentence", () => {
     const texts = [1, 2, 3, 4, 5, 6].map((level) => sentence(data, level));
     expect(new Set(texts).size).toBe(6);
+  });
+
+  it("says at level 1 that the split paid is not the figure at the top, with both live numbers", () => {
+    for (const site of data.meta.sites) {
+      for (const year of [2, 20]) {
+        const view = { ...withSite(defaultState(data), data, site.id), year };
+        const result = compute(data, view);
+        const shown = present(data, view, result, { playing: false, reduced: true, level: 1 });
+        const text = shown.stage.sentence.map((part) => part.text).join("");
+        const paid = shown.stage.sentence.find((part) => part.key === "s1")?.text;
+        const top = String(Math.round(result.headlineShare * 100));
+        expect(Number(paid), `${site.id} year ${year}`).toBeCloseTo((result.tiers[0].outputHome / result.spendEur) * 100, 1);
+        expect(text).toContain(`not yet the ${top} at the top`);
+        expect(text).toContain(`how ${paid} becomes ${top}.`);
+        expect(shown.headline.startsWith(`${top} cents`)).toBe(true);
+      }
+    }
+  });
+
+  it("says which size the jobs and the industry amounts are for, and follows the size", () => {
+    for (const size of ["1", "50"]) {
+      const view = withSize(defaultState(data), size);
+      const shown = present(data, view, compute(data, view), { playing: false, reduced: true, level: 5 });
+      expect(shown.panels.jobs.note).toContain(`For ${size} MW of IT load`);
+      expect(shown.panels.industries.note).toBe(shown.panels.jobs.note);
+    }
+  });
+
+  it("gives the build jobs as job-years and as jobs a year over the build", () => {
+    const view = defaultState(data);
+    const result = compute(data, view);
+    const shown = present(data, view, result, { playing: false, reduced: true, level: 5 });
+    const text = shown.panels.jobs.pieces.map((piece) => piece.text).join("");
+    const rate = Number(text.match(/about ([\d.]+) jobs a year/)?.[1]);
+    const total = Number(text.match(/supports ([\d.]+) job-years over its 2 years/)?.[1]);
+    expect(total).toBeCloseTo(result.constructionJobs, 1);
+    expect(rate).toBeCloseTo(result.constructionJobs / 2, 1);
+    expect(shown.panels.jobs.unit).toContain("in operation");
   });
 
   it("ties the level 3 total to the whole cents at the top", () => {
@@ -150,22 +188,26 @@ describe("servers bought by a tenant", () => {
 describe("level year progression and source explanations", () => {
   const data = servedData();
 
-  it("moves from the build year to the twenty-year view at level 4 and keeps custom years across levels 4 to 6", () => {
+  it("opens at year 2 and applies the year the reader chooses at every level", () => {
     const start = defaultState(data);
     expect(start.year).toBe(2);
-    expect(withLevelYear(start, data, 3).year).toBe(2);
-    const level4 = withLevelYear(start, data, 4);
-    expect(level4.year).toBe(20);
-    const custom = { ...level4, year: 10 };
-    expect(withLevelYear(custom, data, 5).year).toBe(10);
-    expect(withLevelYear(custom, data, 6).year).toBe(10);
-    expect(withLevelYear(custom, data, 3).year).toBe(2);
+    const bounds = yearBounds(data.lifecycle[start.site][start.archetype].central.spend.construction.length);
+    const chosen = withYear(start, "10", bounds);
+    const headline = (view: typeof start, level: number) =>
+      present(data, view, compute(data, view), { playing: false, reduced: true, level }).headline;
+    const atBuild = headline(start, 1);
+    const atTen = headline(chosen, 4);
+    expect(atTen).not.toBe(atBuild);
+    for (const level of [1, 2, 3, 4, 5, 6]) {
+      expect(headline(start, level), `level ${level}, year 2`).toBe(atBuild);
+      expect(headline(chosen, level), `level ${level}, year 10`).toBe(atTen);
+    }
   });
 
   it("resolves every source card without missing entries across sites, years and levels", () => {
     for (const siteId of ["vienna", "zurich", "lugano"] as const) {
-      for (const level of [1, 2, 3, 4, 5, 6]) {
-        const viewState = withLevelYear(withSite(defaultState(data), data, siteId), data, level);
+      for (const [level, year] of [1, 2, 3, 4, 5, 6].flatMap((step) => [2, 10, 20].map((at) => [step, at]))) {
+        const viewState = { ...withSite(defaultState(data), data, siteId), year };
         const shown = present(data, viewState, compute(data, viewState), { playing: false, reduced: true, level });
         for (const [id, exp] of Object.entries(shown.explanations)) {
           if (id !== "size") expect(exp.sources.length, `${siteId} L${level} ${id}`).toBeGreaterThan(0);

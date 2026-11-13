@@ -77,6 +77,8 @@ const YEARS_LEVEL = 4;
 const SUMMARY_FROM = 4;
 const COMPARE_LEVEL = 3;
 const MAP_LEVEL = 1;
+/** The source panel of the figure at the top, opened by present(). */
+const HEADLINE_ID = "headline";
 
 function words(key: string, text: string): StagePart {
   return { key, text, infoId: null, name: null };
@@ -247,13 +249,21 @@ export function buildStage(data: Dataset, state: ViewState, result: Result, leve
         words("a2", ` ${t("centsWord")}`),
       ];
 
+  const headlineCents = centsOf(result.headlineShare);
   const sentence = level === 1
     ? [
         words("s0", t("lead1a")),
         num("s1", shown(direct.outputHome), direct.outId, `${shown(direct.outputHome)} ${t("centsWord")}`),
         words("s2", t("lead1b", { place })),
         num("s3", shown(direct.outputAbroad), direct.abroadOutId, `${shown(direct.outputAbroad)} ${t("centsWord")}`),
+        // Being paid is not keeping: say so here, with the two live figures, so the split is not read as the headline.
         words("s4", t("lead1c")),
+        num("s5", headlineCents, HEADLINE_ID, `${headlineCents} ${t("centsWord")}`),
+        words("s6", t("lead1d", { place })),
+        num("s7", shown(direct.outputHome), direct.outId, `${shown(direct.outputHome)} ${t("centsWord")}`),
+        words("s8", t("lead1e")),
+        num("s9", headlineCents, HEADLINE_ID, `${headlineCents} ${t("centsWord")}`),
+        words("s10", t("lead1f")),
       ]
     : level === 2
       ? [
@@ -267,7 +277,7 @@ export function buildStage(data: Dataset, state: ViewState, result: Result, leve
         ? [
             words("s0", t("lead3a", { place })),
             num("s1", exact(keptSum), "sum", `${exact(keptSum)} ${t("centsWord")}`),
-            words("s2", t("lead3c", { headline: centsOf(result.headlineShare) })),
+            words("s2", t("lead3c", { headline: headlineCents })),
           ]
         : level === 4
           ? [

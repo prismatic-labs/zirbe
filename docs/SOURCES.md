@@ -333,7 +333,7 @@ Low 500,000, central 700,000, high 1,000,000, in EUR per MW of heat output.
 
 Source: Zangeneh and Øi, Utilization of excess heat from data centers, University of South-Eastern Norway (2022). Read on 2026-11-10. [Link](https://openarchive.usn.no/usn-xmlui/handle/11250/3009228)
 
-A master's thesis case study (Rjukan, Norway) assumes EUR 0.7 million per MW of heat pump output. One case, so the range is wide. Heat pump output per MW of IT load equals the share of server heat captured, since the compressor electricity is already part of the facility load.
+A master's thesis case study (Rjukan, Norway) assumes EUR 0.7 million per MW of heat pump output. One case, so the range is wide. Heat pump output per MW of IT load equals the share of IT energy delivered as heat to the network, which already includes the heat pumps' own electricity.
 
 ### Cost of the connection to the heat network, per MW
 

@@ -622,8 +622,8 @@
   note: >-
     A master's thesis case study (Rjukan, Norway) assumes EUR 0.7 million per
     MW of heat pump output. One case, so the range is wide. Heat pump output
-    per MW of IT load equals the share of server heat captured, since the
-    compressor electricity is already part of the facility load.
+    per MW of IT load equals the share of IT energy delivered as heat to the
+    network, which already includes the heat pumps' own electricity.
   source_accessed: "2026-11-10"
   source_published: "2022"
   status: approved

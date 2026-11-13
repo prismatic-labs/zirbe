@@ -12,6 +12,8 @@ import type { SliderId, ViewState } from "./state";
 /** Years 1 and 2 are the build. Operations run from year 3. */
 const FIRST_YEAR = 1;
 const BUILD_LAST_YEAR = 2;
+/** How many years the build takes, for copy that spreads its job-years over them. */
+export const BUILD_YEARS = BUILD_LAST_YEAR - FIRST_YEAR + 1;
 const OPERATIONS_FIRST_YEAR = 3;
 const MILLION = 1_000_000;
 const SAME_SHARE = 0.0005;

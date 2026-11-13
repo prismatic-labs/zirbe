@@ -1,6 +1,6 @@
 import type { Assumption, Dataset, Meta } from "../data/types";
 import { t } from "../i18n";
-import type { Result } from "./compute";
+import { BUILD_YEARS, type Result } from "./compute";
 import {
   barWidth,
   centsOf,
@@ -68,6 +68,8 @@ export interface TileModel {
   figureInfoId: string;
   figureName: string;
   unit: string;
+  /** Says which size the total is for, where the reader might take it as a fixed figure. */
+  note?: string;
   pieces: TilePiece[];
 }
 
@@ -121,7 +123,7 @@ export interface View {
   };
   panels: {
     countries: { title: string; rows: RowModel[] };
-    industries: { title: string; rows: RowModel[] };
+    industries: { title: string; note: string; rows: RowModel[] };
     jobs: TileModel;
     energy: TileModel | null;
     grid: TileModel | null;
@@ -424,6 +426,7 @@ export function present(data: Dataset, state: ViewState, result: Result, flags: 
 
   const netCarbon = formatCarbon(result.embodiedKg + result.operationalKg - result.heatOffsetKg);
   remember("carbon:net", t("carbonTitle"), t("what.carbonNet"), result.carbonSourceIds);
+  const scaledNote = t("scaledNote", { mw: formatCount(state.sizeMw) });
   const jobsTile = result.ongoingJobs === null
     ? {
       title: t("jobsTitle"),
@@ -431,6 +434,7 @@ export function present(data: Dataset, state: ViewState, result: Result, flags: 
       figureInfoId: "jobs:construction",
       figureName: t("constructionJobs"),
       unit: t("jobYearsUnit"),
+      note: scaledNote,
       pieces: [{ key: "empty", text: t("ongoingEmpty"), infoId: null, name: null }],
     }
     : {
@@ -438,10 +442,15 @@ export function present(data: Dataset, state: ViewState, result: Result, flags: 
       figure: formatCount(result.ongoingJobs),
       figureInfoId: "jobs:ongoing",
       figureName: t("ongoingJobs"),
-      unit: t("jobsAYearUnit"),
+      unit: t("jobsOngoingUnit"),
+      note: scaledNote,
+      // Job-years alone are hard to set against jobs a year, so the build is given both ways.
       pieces: [
         { key: "lead", text: t("tileJobsLead"), infoId: null, name: null },
-        { key: "build", text: `${t("jobYears", { count: formatCount(result.constructionJobs) })}${t("tileJobsTail")}`, infoId: "jobs:construction", name: t("constructionJobs") },
+        { key: "build", text: t("jobYears", { count: formatCount(result.constructionJobs) }), infoId: "jobs:construction", name: t("constructionJobs") },
+        { key: "mid", text: t("tileJobsMid", { years: String(BUILD_YEARS) }), infoId: null, name: null },
+        { key: "rate", text: t("jobsAYear", { count: formatCount(result.constructionJobs / BUILD_YEARS) }), infoId: "jobs:construction", name: t("constructionJobs") },
+        { key: "tail", text: t("tileJobsTail"), infoId: null, name: null },
       ],
     };
   const carbonTile = {
@@ -688,7 +697,7 @@ export function present(data: Dataset, state: ViewState, result: Result, flags: 
     },
     panels: {
       countries: { title: t("countriesTitle"), rows: countries },
-      industries: { title: t("industriesTitle"), rows: industries },
+      industries: { title: t("industriesTitle"), note: scaledNote, rows: industries },
       jobs: jobsTile,
       energy: energyTile,
       grid: gridTile,

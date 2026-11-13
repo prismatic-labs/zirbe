@@ -14,7 +14,6 @@ import {
   withCurrency,
   withElectricity,
   withHeat,
-  withLevelYear,
   withServers,
   withShare,
   withSite,
@@ -59,7 +58,7 @@ export function Screen({ onMethod }: { onMethod: () => void }) {
     loadData()
       .then((loaded) => {
         setData(loaded);
-        setState(withLevelYear(defaultState(loaded), loaded, readLevel(window.location.hash)));
+        setState(defaultState(loaded));
         document.title = loaded.meta.name;
       })
       .catch(() => setFailed(true));
@@ -69,18 +68,16 @@ export function Screen({ onMethod }: { onMethod: () => void }) {
     // Only level links move the ladder; the skip link and #method leave it where it is.
     const onHash = () => {
       if (!window.location.hash.startsWith("#level-")) return;
-      const next = readLevel(window.location.hash);
       setPlaying(false);
-      setState((current) => (current && data ? withLevelYear(current, data, next) : current));
-      setLevel(next);
+      setLevel(readLevel(window.location.hash));
     };
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
-  }, [data]);
+  }, []);
 
+  // The year belongs to the reader: it opens at the build and, once moved, stays put at every level.
   const goLevel = (next: number) => {
     setPlaying(false);
-    setState((current) => (current && data ? withLevelYear(current, data, next) : current));
     setLevel(next);
     // A hosted viewer may refuse history changes; the level still changes, only the link does not.
     try {

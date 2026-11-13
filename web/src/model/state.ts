@@ -22,8 +22,6 @@ export interface ViewState {
 const FIRST_YEAR = 1;
 /** The page opens at year 2, the construction view, before the first IT fit-out. */
 export const OPEN_YEAR = 2;
-/** Level 4 is the twenty-year view, where the headline moves from the build to the lifecycle. */
-const LIFECYCLE_FROM_LEVEL = 4;
 
 export function yearBounds(length: number): { min: number; max: number } {
   return { min: FIRST_YEAR, max: length };
@@ -134,16 +132,4 @@ export function stepPlay(state: ViewState, data: Dataset): ViewState {
   const bounds = yearBounds(data.lifecycle[state.site][state.archetype][state.scenario].spend.construction.length);
   if (state.year >= bounds.max) return state;
   return { ...state, year: state.year + 1 };
-}
-
-export function withLevelYear(state: ViewState, data: Dataset, level: number): ViewState {
-  const bounds = yearBounds(data.lifecycle[state.site][state.archetype][state.scenario].spend.construction.length);
-  if (level < LIFECYCLE_FROM_LEVEL) {
-    const buildYear = Math.min(bounds.max, Math.max(bounds.min, OPEN_YEAR));
-    return state.year === buildYear ? state : { ...state, year: buildYear };
-  }
-  if (state.year <= OPEN_YEAR) {
-    return { ...state, year: bounds.max };
-  }
-  return state;
 }
