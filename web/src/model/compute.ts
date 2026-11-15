@@ -7,7 +7,9 @@ import type {
   Schedule,
 } from "../data/types";
 import { blend } from "./blend";
-import type { SliderId, ViewState } from "./state";
+import { headlineDrivers, type Driver } from "./drivers";
+import { hasSlider, readerShare, SAME_SHARE, type ViewState } from "./state";
+import { staffFingerprint } from "./staff";
 
 /** Years 1 and 2 are the build. Operations run from year 3. */
 const FIRST_YEAR = 1;
@@ -16,7 +18,6 @@ const BUILD_LAST_YEAR = 2;
 export const BUILD_YEARS = BUILD_LAST_YEAR - FIRST_YEAR + 1;
 const OPERATIONS_FIRST_YEAR = 3;
 const MILLION = 1_000_000;
-const SAME_SHARE = 0.0005;
 
 export interface Bucket {
   id: string;
@@ -30,6 +31,8 @@ export interface Result {
   headlineShare: number;
   bandLowShare: number;
   bandHighShare: number;
+  /** Each assumption moved alone, largest effect on the headline first. */
+  drivers: Driver[];
   countries: Bucket[];
   industries: Bucket[];
   constructionJobs: number;
@@ -155,27 +158,6 @@ function categoryScheduleIds(
   });
 }
 
-function staffFingerprint(home: Purchaser): Fingerprint {
-  const industry: Record<string, number> = {
-    construction: 0, electrical_machinery: 0, electronics: 0, metals_mining: 0, energy: 0,
-    transport_logistics: 0, trade: 0, business_services: 0, it_services: 1, other: 0,
-  };
-  return {
-    tiers: [
-      { tier: "0", output: { [home]: 1 }, va: { [home]: 1 }, tax: 0, purchases: {} },
-      { tier: "1", output: {}, va: {}, tax: 0, purchases: {} },
-      { tier: "2", output: {}, va: {}, tax: 0, purchases: {} },
-      { tier: "3", output: {}, va: {}, tax: 0, purchases: {} },
-      { tier: "4+", va: {}, tax: 0 },
-    ],
-    va: { [home]: 1 },
-    tax: 0,
-    va_domestic_by_industry: industry,
-    co2e_kg: {},
-    jobs_domestic_per_meur: 0,
-  };
-}
-
 function emptyTier(): TierCents {
   return {
     outputHome: 0, outputAbroad: 0, vaHome: 0, vaAbroad: 0,
@@ -220,12 +202,6 @@ function addTier(into: TierCents, tier: Fingerprint["tiers"][number], home: Purc
   }
 }
 
-function hasSlider(data: Dataset, id: CategoryId): id is SliderId {
-  return data.meta.categories.some((category) => category.id === id && category.has_slider)
-    && id !== "staff"
-    && (id === "electrical" || id === "cooling" || id === "it_hardware");
-}
-
 interface Run {
   spendEur: number;
   domesticVaEur: number;
@@ -261,9 +237,8 @@ function domesticShare(
   state: ViewState,
   scenario: ViewState["scenario"],
 ): number {
-  if (hasSlider(data, categoryId) && Math.abs(state.sourcing[categoryId] - pair.default_domestic_share) > SAME_SHARE) {
-    return state.sourcing[categoryId];
-  }
+  const chosen = readerShare(data, pair, categoryId, state);
+  if (chosen !== null) return chosen;
   if (scenario === "low_impact") return pair.domestic_share_low;
   if (scenario === "high_impact") return pair.domestic_share_high;
   return pair.default_domestic_share;
@@ -478,6 +453,7 @@ export function compute(data: Dataset, state: ViewState): Result {
     headlineShare: mainShare,
     bandLowShare: Math.min(low, high, mainShare),
     bandHighShare: Math.max(low, high, mainShare),
+    drivers: state.scenario === "central" ? headlineDrivers(data, state, book.central, site.country, heatOn) : [],
     countries: buckets(main.countries as Map<string, number>),
     industries: buckets(main.industries),
     constructionJobs: main.constructionJobs,

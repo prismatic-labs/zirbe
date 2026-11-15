@@ -14,6 +14,8 @@ from engine.fingerprints import blended
 from engine.mappings import contract_enum
 
 Lookup = Callable[[str], float]
+# Only the central schedule lists its variants: each one moves a single assumption away from central.
+VARIANTS_IN = "central"
 
 
 def years() -> int:
@@ -176,6 +178,46 @@ def scenario_sets(site_id: str, archetype: str, a: dict[str, dict[str, Any]], va
     return {"low_impact": low, "central": central, "high_impact": high}
 
 
+def variant(central: dict[str, Any], moved: dict[str, Any]) -> dict[str, Any]:
+    """What differs from the central schedule: the spend series and the cost of the heat pumps' electricity."""
+    out: dict[str, Any] = {}
+    spend = {c: series for c, series in moved["spend"].items() if series != central["spend"][c]}
+    if spend:
+        out["spend"] = spend
+    if moved["heat_pump_spend"] != central["heat_pump_spend"]:
+        out["heat_pump_spend"] = moved["heat_pump_spend"]
+    return out
+
+
+def variants(site_id: str, archetype: str, a: dict[str, dict[str, Any]], central: dict[str, float],
+             m: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Each assumption moved alone to its low and to its high value, the others central, as the
+    changes to the central schedule. An assumption that changes neither spend nor a domestic
+    share is left out. Series are compared as written, so rounding cannot make a difference."""
+    decimals = m["output"]["decimals"]
+
+    def at(values: dict[str, float]) -> dict[str, Any]:
+        return rounded(schedule(site_id, archetype, Recorder(values), m), decimals)
+
+    probe = Recorder(central)
+    schedule(site_id, archetype, probe, m)
+    base = at(central)
+    out: dict[str, dict[str, Any]] = {}
+    for aid in probe.used:
+        ends = {end: variant(base, at({**central, aid: a[aid][end]})) for end in ("low", "high")}
+        if ends["low"] or ends["high"]:
+            out[aid] = ends
+    country = m["sites"][site_id]["country"].lower()
+    for category, cat in m["categories"].items():
+        if "domestic_share" not in cat:
+            continue
+        x = a[f"{cat['domestic_share']['assumption']}.{country}"]
+        ends = {end: {"domestic_share": {category: x[end]}} if x[end] != x["central"] else {} for end in ("low", "high")}
+        if ends["low"] or ends["high"]:
+            out[x["id"]] = ends
+    return out
+
+
 def rounded(node: Any, decimals: int) -> Any:
     if isinstance(node, float):
         return round(node, decimals) + 0.0
@@ -197,6 +239,8 @@ def build(m: dict[str, Any], a: dict[str, dict[str, Any]], va_home: dict[str, di
                 v = Recorder(sets[scenario])
                 sched = schedule(site_id, archetype, v, m)
                 sched["source_ids"] = list(v.used)
+                if scenario == VARIANTS_IN:
+                    sched["variants"] = variants(site_id, archetype, a, sets[scenario], m)
                 doc.setdefault(site_id, {}).setdefault(archetype, {})[scenario] = rounded(sched, m["output"]["decimals"])
     return doc
 

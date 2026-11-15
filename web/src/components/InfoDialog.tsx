@@ -30,6 +30,17 @@ export function InfoDialog({ explained, onClose }: { explained: Explained | null
         <li>{explained.priceLine}</li>
         {explained.averageNote ? <li>{explained.averageNote}</li> : null}
       </ul>
+      {explained.drivers ? (
+        <section className="drivers">
+          <p className="dialog-group">{explained.drivers.title}</p>
+          <p className="drivers-note">{explained.drivers.note}</p>
+          <ol>
+            {explained.drivers.rows.map((row) => (
+              <li key={row.key}><b>{row.label}</b><span>{row.text}</span></li>
+            ))}
+          </ol>
+        </section>
+      ) : null}
       {assumptions.length ? <p className="dialog-group">{t("sourcesAssumptions")}</p> : null}
       {assumptions.length ? <div className="sources">{assumptions.map((source) => <Card key={source.key} source={source} />)}</div> : null}
       {data.length ? <p className="dialog-group">{t("sourcesData")}</p> : null}

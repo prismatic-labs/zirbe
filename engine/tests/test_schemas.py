@@ -144,6 +144,12 @@ BREAKS: list[tuple[str, str, Mutation]] = [
     ("lifecycle", "heat pump spend missing", _drop(SCHED + ["heat_pump_spend"])),
     ("lifecycle", "heat pump spend of 19", _drop(SCHED + ["heat_pump_spend", 0])),
     ("lifecycle", "negative heat pump spend", _set(SCHED + ["heat_pump_spend", 5], -1.0)),
+    ("lifecycle", "variant with an unknown field", _set(SCHED + ["variants"], {f.ASSUMPTION_ID: {"low": {"jobs": 1.0}, "high": {}}})),
+    ("lifecycle", "variant without a high end", _set(SCHED + ["variants"], {f.ASSUMPTION_ID: {"low": {}}})),
+    ("lifecycle", "variant with an empty spend", _set(SCHED + ["variants"], {f.ASSUMPTION_ID: {"low": {"spend": {}}, "high": {}}})),
+    ("lifecycle", "variant spend series of 19", _set(SCHED + ["variants"], {f.ASSUMPTION_ID: {"low": {"spend": {"staff": f.series()[1:]}}, "high": {}}})),
+    ("lifecycle", "variant share above 1", _set(SCHED + ["variants"], {f.ASSUMPTION_ID: {"low": {}, "high": {"domestic_share": {"it_hardware": 1.5}}}})),
+    ("lifecycle", "variants outside the central schedule", _set(["vienna", "ai", "low_impact", "variants"], {})),
     # assumptions
     ("assumptions", "empty list", lambda doc: doc.clear()),
     ("assumptions", "low missing", _drop([0, "low"])),
@@ -177,6 +183,14 @@ def test_cross_file_sources_resolve() -> None:
     assert schemas.validate_docs(_all_docs()) == []
 
 
+def test_a_variant_that_matches_the_fingerprints_passes() -> None:
+    docs = _all_docs()
+    docs["lifecycle"]["vienna"]["ai"]["central"]["variants"] = {
+        f.ASSUMPTION_ID: {"low": {"domestic_share": {"it_hardware": 0.0}}, "high": {"spend": {"staff": f.series()}}},
+    }
+    assert schemas.validate_docs(docs) == []
+
+
 @pytest.mark.parametrize(
     ("label", "mutate"),
     [
@@ -185,6 +199,10 @@ def test_cross_file_sources_resolve() -> None:
         ("fingerprint cites nothing known", lambda d: d["fingerprints"]["CH"]["cooling"].update(source_ids=["teco2"])),
         ("schedule cites nothing known", lambda d: d["lifecycle"]["linz"]["cloud"]["low_impact"].update(source_ids=["pue.linz"])),
         ("dataset id reused as assumption", lambda d: d["assumptions"].append(f.assumption(f.DATASET_ID))),
+        ("variant cites nothing known", lambda d: d["lifecycle"]["vienna"]["ai"]["central"].update(
+            variants={"pue.missing": {"low": {}, "high": {}}})),
+        ("variant share differs from the fingerprints", lambda d: d["lifecycle"]["vienna"]["ai"]["central"].update(
+            variants={f.ASSUMPTION_ID: {"low": {}, "high": {"domestic_share": {"it_hardware": 0.5}}}})),
     ],
 )
 def test_cross_file_rejects(label: str, mutate: Callable[[dict[str, Any]], None]) -> None:

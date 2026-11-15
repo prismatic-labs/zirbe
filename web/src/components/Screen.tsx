@@ -5,6 +5,7 @@ import type { Dataset } from "../data/types";
 import { t } from "../i18n";
 import { compute } from "../model/compute";
 import { EARLIER, LATER, levelHash, readLevel, stepLevel } from "../model/level";
+import { caseQuery, isChanged, readCase } from "../model/link";
 import { present } from "../model/present";
 import {
   defaultState,
@@ -22,6 +23,7 @@ import {
   yearBounds,
   type ViewState,
 } from "../model/state";
+import { linkWriteMs } from "../model/timing";
 import { Controls } from "./Controls";
 import { InfoDialog, SourceLink } from "./InfoDialog";
 import { FootprintPanels, PeoplePanels } from "./Panels";
@@ -51,14 +53,15 @@ export function Screen({ onMethod }: { onMethod: () => void }) {
   const [state, setState] = useState<ViewState | null>(null);
   const [playing, setPlaying] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
-  const [copyState, setCopyState] = useState<"idle" | "copied" | "manual">("idle");
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "manual" | "link" | "linkManual">("idle");
   const [level, setLevel] = useState(() => readLevel(window.location.hash));
 
   useEffect(() => {
     loadData()
       .then((loaded) => {
         setData(loaded);
-        setState(defaultState(loaded));
+        // A link carries the case its sender had on screen; without one this is the starting case.
+        setState(readCase(window.location.search, loaded));
         document.title = loaded.meta.name;
       })
       .catch(() => setFailed(true));
@@ -116,8 +119,25 @@ export function Screen({ onMethod }: { onMethod: () => void }) {
     if (state.year >= bounds.max) setPlaying(false);
   }, [playing, data, state]);
 
+  const query = data && state ? caseQuery(state, data) : null;
+  useEffect(() => {
+    if (query === null) return;
+    // Wait until the case rests: a dragged slider would otherwise rewrite the address many times a second.
+    const timer = window.setTimeout(() => {
+      try {
+        window.history.replaceState(null, "", `${window.location.pathname}${query}${window.location.hash}`);
+      } catch {
+        /* a hosted viewer may refuse history changes; the page still works, only the address stays as it was */
+      }
+    }, linkWriteMs());
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
   if (failed) return <p className="status">{t("error")}</p>;
   if (!data || !state || !view) return <p className="status">{t("loading")}</p>;
+
+  const caseUrl = `${window.location.origin}${window.location.pathname}${query ?? ""}${levelHash(level)}`;
+  const summaryText = `${view.summary.text}\n${t("summaryLink", { url: caseUrl })}`;
 
   return (
     <>
@@ -278,10 +298,30 @@ export function Screen({ onMethod }: { onMethod: () => void }) {
               <button
                 type="button"
                 onClick={() => {
-                  navigator.clipboard.writeText(view.summary.text).then(() => setCopyState("copied"), () => setCopyState("manual"));
+                  navigator.clipboard.writeText(summaryText).then(() => setCopyState("copied"), () => setCopyState("manual"));
                 }}
               >
                 {view.summary.label}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard.writeText(caseUrl).then(() => setCopyState("link"), () => setCopyState("linkManual"));
+              }}
+            >
+              {t("linkCopy")}
+            </button>
+            {isChanged(state, data) ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setPlaying(false);
+                  setCopyState("idle");
+                  setState(defaultState(data));
+                }}
+              >
+                {t("reset")}
               </button>
             ) : null}
             <p className="quiet tap">{view.stage.tap}</p>
@@ -290,7 +330,14 @@ export function Screen({ onMethod }: { onMethod: () => void }) {
           {view.stage.showCase && copyState === "manual" ? (
             <>
               <p className="quiet" role="status">{view.summary.fallback}</p>
-              <textarea className="summary-text" readOnly value={view.summary.text} onFocus={(event) => event.target.select()} />
+              <textarea className="summary-text" readOnly value={summaryText} onFocus={(event) => event.target.select()} />
+            </>
+          ) : null}
+          {copyState === "link" ? <p className="quiet" role="status">{t("linkCopied")}</p> : null}
+          {copyState === "linkManual" ? (
+            <>
+              <p className="quiet" role="status">{t("linkFallback")}</p>
+              <input className="summary-text link-text" readOnly value={caseUrl} aria-label={t("linkCopy")} onFocus={(event) => event.target.select()} />
             </>
           ) : null}
         </section>

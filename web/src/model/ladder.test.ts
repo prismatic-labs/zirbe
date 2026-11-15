@@ -4,10 +4,11 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import type { Assumptions, Dataset, Fingerprints, Lifecycle, Meta } from "../data/types";
 import { compute } from "./compute";
+import { headlineWith } from "./drivers";
 import { energyInAYear } from "./energy";
 import { present } from "./present";
 import { yearsGeometry } from "./spark";
-import { defaultState, withHeat, withSite, withSize, withYear, yearBounds } from "./state";
+import { defaultState, withHeat, withServers, withShare, withSite, withSize, withYear, yearBounds } from "./state";
 
 const webRoot = resolve(fileURLToPath(new URL(".", import.meta.url)), "../..");
 
@@ -117,6 +118,72 @@ describe("ladder copy", () => {
     const last = result.shareByYear[result.shareByYear.length - 1];
     expect(last).toBeLessThan(result.shareByYear[1]);
     expect(sentence(data, 4)).toContain(`falls to ${Math.round(last * 100)} cents`);
+  });
+});
+
+describe("what moves the headline most", () => {
+  const data = servedData();
+  const cases = () => {
+    const base = defaultState(data);
+    const zurich = withSite(base, data, "zurich");
+    return [
+      base,
+      { ...base, year: 20 },
+      { ...withHeat(base, data, true), year: 20 },
+      { ...withServers(base, "tenant"), year: 20 },
+      { ...withShare(base, "it_hardware", "0.4"), year: 12 },
+      { ...zurich, archetype: "cloud" as const, year: 7 },
+    ];
+  };
+
+  it("gives the same headline as the main run when nothing is moved", () => {
+    for (const view of cases()) {
+      const site = data.meta.sites.find((entry) => entry.id === view.site)!;
+      const result = compute(data, view);
+      const central = data.lifecycle[view.site][view.archetype].central;
+      expect(headlineWith(data, view, central, site.country, result.heatOn, {})).toBeCloseTo(result.headlineShare, 12);
+    }
+  });
+
+  it("matches a full run on a schedule with the variant laid over it", () => {
+    const view = { ...defaultState(data), year: 20 };
+    const central = data.lifecycle[view.site][view.archetype].central;
+    const result = compute(data, view);
+    const top = result.drivers[0];
+    const ends = central.variants?.[top.id];
+    expect(ends?.high.spend).toBeDefined();
+    const moved = structuredClone(data);
+    Object.assign(moved.lifecycle[view.site][view.archetype].central.spend, ends?.high.spend);
+    expect(compute(moved, view).headlineShare).toBeCloseTo(top.high, 12);
+    expect(headlineWith(data, view, central, "AT", false, ends?.high ?? {})).toBeCloseTo(top.high, 12);
+  });
+
+  it("lists the biggest movers first and names three in the headline's source panel", () => {
+    for (const view of cases()) {
+      const result = compute(data, view);
+      const spans = result.drivers.map((driver) => Math.abs(driver.high - driver.low));
+      expect(spans).toEqual([...spans].sort((a, b) => b - a));
+      const shown = present(data, view, result, { playing: false, reduced: true, level: 4 });
+      const rows = shown.explanations.headline.drivers?.rows ?? [];
+      expect(rows.length).toBe(Math.min(3, result.drivers.length));
+      expect(rows.map((row) => row.key)).toEqual(result.drivers.slice(0, 3).map((driver) => driver.id));
+    }
+  });
+
+  it("leaves the servers out of the movers when a tenant buys them, and a moved slider overrides its share", () => {
+    const base = { ...defaultState(data), year: 20 };
+    const ids = (view: typeof base) => compute(data, view).drivers.map((driver) => driver.id);
+    expect(ids(base)).toContain("it_capex_per_mw.ai");
+    expect(ids(base)).toContain("it_hardware.domestic_share.at");
+    expect(ids(withServers(base, "tenant"))).not.toContain("it_capex_per_mw.ai");
+    expect(ids(withShare(base, "it_hardware", "0.4"))).not.toContain("it_hardware.domestic_share.at");
+  });
+
+  it("leaves heat assumptions out while the heat switch is off", () => {
+    const base = { ...defaultState(data), year: 20 };
+    const heatIds = (view: typeof base) => compute(data, view).drivers.filter((driver) => driver.id.startsWith("heat_"));
+    expect(heatIds(base)).toEqual([]);
+    expect(heatIds(withHeat(base, data, true)).length).toBeGreaterThan(0);
   });
 });
 

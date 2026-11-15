@@ -67,6 +67,12 @@ export interface CategoryFingerprints {
 export type Fingerprints = Record<Purchaser,
   Record<Exclude<CategoryId, "staff">, CategoryFingerprints>>;
 
+export interface Variant {                     // one assumption moved alone: only what differs from the central schedule
+  spend?: Partial<Record<CategoryId, Series20>>;
+  heat_pump_spend?: Series20;
+  domestic_share?: Partial<Record<CategoryId, number>>;   // 0 to 1, for a category whose share is an assumption
+}
+
 export interface Schedule {                    // per MW of IT load, EUR at the price year
   spend: Record<CategoryId, Series20>;  // staff = payroll
   electricity_mwh: Series20;
@@ -80,6 +86,9 @@ export interface Schedule {                    // per MW of IT load, EUR at the 
   cross_border_payroll_share: number;   // 0 to 1
   milestones: { year: number; key: "build" | "first_fit" | "it_refresh" | "midlife_refresh" }[];
   source_ids: string[];
+  // central schedule only: every assumption that moves spend or a domestic share,
+  // at its low and at its high value while the others stay central
+  variants?: Record<string, { low: Variant; high: Variant }>;
 }
 
 export type Lifecycle = Record<SiteId, Record<ArchetypeId, Record<ScenarioId, Schedule>>>;

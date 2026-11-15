@@ -352,6 +352,7 @@ button.seg {
 .chart.is-summary .cent-row.is-sum { border-top: 0; padding-top: 0; }
 
 .compare { display: block; color: var(--ink); }
+.summary-text.link-text { min-height: 0; }
 .summary-text { width: 100%; min-height: 9rem; font: inherit; font-size: var(--text-small); color: var(--ink); background: var(--panel); border: 1px solid var(--rule); border-radius: 2px; padding: 0.5rem; }
 .abroad-line { margin: 0.2rem 0 0; color: var(--ink); font-size: 1rem; line-height: 1.5; }
 
@@ -795,6 +796,12 @@ footer p { margin: 0; }
 .dialog-what { margin: 0; font-size: 1.0625rem; line-height: 1.45; max-width: 62ch; }
 .dialog-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0; padding: 0; list-style: none; }
 .dialog-chips li { border: 1px solid var(--divider); border-radius: 2px; padding: 0.15rem 0.5rem; color: var(--secondary); font-size: var(--text-small); }
+.drivers { display: grid; gap: 0.3rem; }
+.drivers-note { margin: 0; font-size: var(--text-small); color: var(--secondary); max-width: 62ch; }
+.drivers ol { margin: 0; padding: 0 0 0 1.2rem; display: grid; gap: 0.3rem; }
+.drivers li { font-size: var(--text-body); }
+.drivers li b { display: block; font-weight: 600; }
+.drivers li span { color: var(--secondary); font-variant-numeric: tabular-nums; }
 .dialog-group { margin: 0.3rem 0 0; color: var(--pine); font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
 .sources { display: grid; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); gap: 0.75rem; }
 .source-card { min-width: 0; border: 1px solid var(--divider); border-radius: 3px; padding: 0.7rem 0.8rem; display: grid; gap: 0.45rem; align-content: start; background: var(--surface); }

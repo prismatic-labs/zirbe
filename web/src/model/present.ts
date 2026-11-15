@@ -5,6 +5,7 @@ import {
   barWidth,
   centsOf,
   formatCarbon,
+  formatCentimes,
   formatCount,
   formatMoney,
   formatPrecise,
@@ -21,6 +22,9 @@ import { shareBounds, sizeField, yearBounds, type ViewState } from "./state";
 import { motionMs, playMs } from "./timing";
 
 const VISIBLE_ROWS = 24;
+/** How many assumptions the headline's source panel names as its biggest movers. */
+const TOP_DRIVERS = 3;
+const PER_EURO = 100;
 
 export interface SourceCard {
   key: string;
@@ -43,6 +47,8 @@ export interface Explained {
   priceLine: string;
   averageNote: string | null;
   sources: SourceCard[];
+  /** For the headline: the assumptions that move it most, each moved alone. */
+  drivers?: { title: string; note: string; rows: { key: string; label: string; text: string }[] };
 }
 
 export interface RowModel {
@@ -281,6 +287,22 @@ export function present(data: Dataset, state: ViewState, result: Result, flags: 
     ? t("bandFlat", { cents: lowCents })
     : t("band", { low: lowCents, high: highCents });
   remember("headline", headline, t("what.headline"), result.headlineSourceIds);
+  const labels = new Map(data.assumptions.map((entry) => [entry.id, entry.label]));
+  const movers = result.drivers.filter((driver) => labels.has(driver.id)).slice(0, TOP_DRIVERS);
+  if (movers.length) {
+    explanations.headline.drivers = {
+      title: t("driversTitle"),
+      note: t("driversNote", { year: String(state.year) }),
+      rows: movers.map((driver) => ({
+        key: driver.id,
+        label: labels.get(driver.id) ?? driver.id,
+        text: t("driverEnds", {
+          low: formatCentimes(driver.low * PER_EURO),
+          high: formatCentimes(driver.high * PER_EURO),
+        }),
+      })),
+    };
+  }
   const yearParts: StagePart[] = [
     { key: "y0", text: t("yearBefore"), infoId: null, name: null },
     { key: "y1", text: String(state.year), infoId: "year", name: t("yearLabel", { year: String(state.year) }) },

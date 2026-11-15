@@ -107,6 +107,16 @@ def _fingerprint_errors(doc: dict[str, Any]) -> list[str]:
     ]
 
 
+def _lifecycle_errors(doc: dict[str, Any]) -> list[str]:
+    return [
+        f"lifecycle.{site}.{archetype}.{scenario}: only the central schedule lists variants"
+        for site, archetypes in doc.items()
+        for archetype, scenarios in archetypes.items()
+        for scenario, schedule in scenarios.items()
+        if scenario != "central" and "variants" in schedule
+    ]
+
+
 def contract_errors(name: str, doc: Any) -> list[str]:
     """Schema errors, then the single-file rules JSON Schema cannot express."""
     errors = schema_errors(name, doc)
@@ -118,6 +128,8 @@ def contract_errors(name: str, doc: Any) -> list[str]:
         return _assumption_errors(doc)
     if name == "fingerprints":
         return _fingerprint_errors(doc)
+    if name == "lifecycle":
+        return _lifecycle_errors(doc)
     return []
 
 
@@ -139,6 +151,25 @@ def source_refs(name: str, doc: Any) -> Iterator[tuple[str, str]]:
                 for scenario, schedule in scenarios.items():
                     for sid in schedule["source_ids"]:
                         yield f"lifecycle.{site}.{archetype}.{scenario}", sid
+                    for sid in schedule.get("variants", {}):
+                        yield f"lifecycle.{site}.{archetype}.{scenario}.variants", sid
+
+
+def _variant_share_errors(docs: dict[str, Any]) -> list[str]:
+    """A variant's domestic share is the low or the high share the fingerprints carry for that category."""
+    country = {site["id"]: site["country"] for site in docs["meta"]["sites"]}
+    errors = []
+    for site, archetypes in docs["lifecycle"].items():
+        for archetype, scenarios in archetypes.items():
+            for aid, ends in scenarios["central"].get("variants", {}).items():
+                for end, changed in ends.items():
+                    for category, share in changed.get("domestic_share", {}).items():
+                        if share != docs["fingerprints"][country[site]][category][f"domestic_share_{end}"]:
+                            errors.append(
+                                f"lifecycle.{site}.{archetype}.central.variants.{aid}.{end}: "
+                                f"{category} share differs from fingerprints domestic_share_{end}"
+                            )
+    return errors
 
 
 def cross_file_errors(docs: dict[str, Any]) -> list[str]:
@@ -153,7 +184,7 @@ def cross_file_errors(docs: dict[str, Any]) -> list[str]:
             for where, sid in source_refs(name, doc)
             if sid not in known
         )
-    return errors
+    return errors + _variant_share_errors(docs)
 
 
 def validate_docs(docs: dict[str, Any]) -> list[str]:

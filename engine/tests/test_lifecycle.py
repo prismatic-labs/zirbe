@@ -107,6 +107,49 @@ def test_scenario_sets_follow_each_assumptions_effect_on_the_headline() -> None:
     assert sets["low_impact"]["grid_factor.at"] == sets["high_impact"]["grid_factor.at"] == 173.0
 
 
+def _ranges(**moved: tuple[float, float, float]) -> dict[str, dict]:
+    values = {**ROUND, "it_hardware.domestic_share.at": 0.02}
+    a = {k: {"id": k, "low": v, "central": v, "high": v} for k, v in values.items()}
+    for aid, (low, central, high) in moved.items():
+        a[aid.replace("__", ".")] = {"id": aid.replace("__", "."), "low": low, "central": central, "high": high}
+    return a
+
+
+def test_variants_list_only_what_one_assumption_changes() -> None:
+    a = _ranges(
+        electricity_price__at=(0.05, 0.1, 0.2),               # electricity, and the heat pumps' electricity
+        staff_per_mw=(2.0, 2.0, 3.0),                         # low equals central: nothing to list at that end
+        grid_factor__at=(100.0, 173.0, 250.0),                # carbon only: left out
+        it_hardware__domestic_share__at=(0.0, 0.02, 0.1),     # a share, not a spend
+    )
+    central = {aid: x["central"] for aid, x in a.items()}
+    found = lifecycle.variants("vienna", "ai", a, central, load_mappings())
+    assert set(found) == {"electricity_price.at", "staff_per_mw", "it_hardware.domestic_share.at"}
+    low = found["electricity_price.at"]["low"]
+    assert set(low) == {"spend", "heat_pump_spend"} and set(low["spend"]) == {"electricity"}
+    assert low["spend"]["electricity"][19] == pytest.approx(8760 * 0.5 * 1.2 * 0.05)
+    assert low["heat_pump_spend"][19] == pytest.approx(8760 * 0.5 * 0.5 / 4.0 * 0.05)
+    assert found["staff_per_mw"]["low"] == {}
+    assert found["staff_per_mw"]["high"]["spend"]["staff"][2] == pytest.approx(3.0 * 3.0)
+    assert found["it_hardware.domestic_share.at"] == {
+        "low": {"domestic_share": {"it_hardware": 0.0}}, "high": {"domestic_share": {"it_hardware": 0.1}},
+    }
+
+
+def test_a_variant_laid_over_the_central_schedule_is_the_moved_schedule() -> None:
+    a = _ranges(it_refresh_years__ai=(4, 5, 6), facility_capex_per_mw__at=(8.0, 10.0, 14.0))
+    central = {aid: x["central"] for aid, x in a.items()}
+    m = load_mappings()
+    base = lifecycle.schedule("vienna", "ai", lifecycle.Recorder(central), m)
+    found = lifecycle.variants("vienna", "ai", a, central, m)
+    for aid, end in (("it_refresh_years.ai", "high"), ("facility_capex_per_mw.at", "low")):
+        moved = lifecycle.schedule("vienna", "ai", lifecycle.Recorder({**central, aid: a[aid][end]}), m)
+        laid = {**base["spend"], **found[aid][end]["spend"]}
+        for category, series in moved["spend"].items():
+            assert laid[category] == pytest.approx(series), (aid, category)
+    assert set(found["it_refresh_years.ai"]["high"]["spend"]) == {"it_hardware"}
+
+
 def test_the_real_assumptions_give_a_lifecycle_that_meets_the_contract() -> None:
     m = load_mappings()
     by_id = assumptions.by_id(assumptions.load_assumptions())
@@ -117,6 +160,10 @@ def test_the_real_assumptions_give_a_lifecycle_that_meets_the_contract() -> None
     assert vienna["central"]["source_ids"][0] == "facility_capex_per_mw.at"
     assert set(vienna["low_impact"]["source_ids"]) == set(vienna["central"]["source_ids"])
     assert all(i in by_id for s in doc.values() for a in s.values() for x in a.values() for i in x["source_ids"])
+    assert "variants" not in vienna["low_impact"] and "variants" not in vienna["high_impact"]
+    moved = vienna["central"]["variants"]
+    assert set(moved) <= set(by_id) and "it_capex_per_mw.ai" in moved and "it_hardware.domestic_share.at" in moved
+    assert "grid_factor.at" not in moved and "cross_border_share.vienna" not in moved
 
 
 def test_meta_meets_the_contract_and_its_date_comes_from_the_inputs() -> None:

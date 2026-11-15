@@ -71,6 +71,8 @@ The switch starts off, because two inputs are estimates: the share of the server
 
 The range under the figure pushes every assumption the same way at once. The low end puts each assumption at whichever end, low or high, gives the lower figure at year 20. The high end puts each at the other end. Assumptions that do not move the figure stay at their central value. The range shows how far the figure could move if every assumption were off in the same direction. It is not a likely range.
 
+The range cannot say which assumption matters most. So the source panel of the figure also lists the three assumptions that move it most, for the case and the year on screen. Each one is moved alone from its low to its high value, while the others stay as they are.
+
 ## Prices and currencies
 
 The table is in US dollars for 2022. Amounts are worked out in 2025 euros: table dollars to euros at the 2022 average rate, then each country's GDP price index from 2022 to 2025. For Swiss sites the page shows francs, at the 2025 average rate. The cents per euro and per franc are the same.
@@ -86,6 +88,7 @@ The table is in US dollars for 2022. Amounts are worked out in 2025 euros: table
 - Induced effects, the spending of wages earned along the way, are left out.
 - Climate differences between sites are not modelled: PUE is the same at every site of a type.
 - Money from sources of other years, such as 2024 and 2026, is converted to euros but not adjusted to 2025 prices.
+- The carbon of grid electricity is held at one value for all twenty years, and so is the carbon of the heat that recovered heat replaces. If power and heat get cleaner, both are overstated in the later years: the carbon from electricity, and the saving from heat recovery. For electricity, the renewable contract view shows the low end.
 - Decommissioning and the end of life of the kit are left out.
 - On-site emissions are left out: refrigerant leaks from the cooling plant and fuel burned by backup power. Water use is left out too. Counting them would raise the carbon footprint.
 - Taxes and levies on electricity are left out of the spending.

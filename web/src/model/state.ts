@@ -133,3 +133,25 @@ export function stepPlay(state: ViewState, data: Dataset): ViewState {
   if (state.year >= bounds.max) return state;
   return { ...state, year: state.year + 1 };
 }
+
+/** Two shares this close are the same slider position. */
+export const SAME_SHARE = 0.0005;
+
+export function hasSlider(data: Dataset, id: CategoryId): id is SliderId {
+  return data.meta.categories.some((category) => category.id === id && category.has_slider)
+    && id !== "staff"
+    && (id === "electrical" || id === "cooling" || id === "it_hardware");
+}
+
+/** The share the reader set on a sourcing slider, or null while the slider sits at the table default. */
+export function readerShare(
+  data: Dataset,
+  pair: { default_domestic_share: number },
+  categoryId: CategoryId,
+  state: ViewState,
+): number | null {
+  if (hasSlider(data, categoryId) && Math.abs(state.sourcing[categoryId] - pair.default_domestic_share) > SAME_SHARE) {
+    return state.sourcing[categoryId];
+  }
+  return null;
+}

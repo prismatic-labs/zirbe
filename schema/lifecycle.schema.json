@@ -58,6 +58,63 @@
         "staff": { "$ref": "#/$defs/Series20" }
       }
     },
+    "PartialSpend": {
+      "description": "Partial<Record<CategoryId, Series20>>. Only the series that differ.",
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "construction": { "$ref": "#/$defs/Series20" },
+        "electrical": { "$ref": "#/$defs/Series20" },
+        "cooling": { "$ref": "#/$defs/Series20" },
+        "it_hardware": { "$ref": "#/$defs/Series20" },
+        "engineering": { "$ref": "#/$defs/Series20" },
+        "electricity": { "$ref": "#/$defs/Series20" },
+        "maintenance": { "$ref": "#/$defs/Series20" },
+        "heat_recovery": { "$ref": "#/$defs/Series20" },
+        "staff": { "$ref": "#/$defs/Series20" }
+      }
+    },
+    "DomesticShares": {
+      "description": "Partial<Record<CategoryId, number>>, each 0 to 1. For a category whose domestic share is an assumption.",
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "construction": { "$ref": "#/$defs/Share" },
+        "electrical": { "$ref": "#/$defs/Share" },
+        "cooling": { "$ref": "#/$defs/Share" },
+        "it_hardware": { "$ref": "#/$defs/Share" },
+        "engineering": { "$ref": "#/$defs/Share" },
+        "electricity": { "$ref": "#/$defs/Share" },
+        "maintenance": { "$ref": "#/$defs/Share" },
+        "heat_recovery": { "$ref": "#/$defs/Share" }
+      }
+    },
+    "Variant": {
+      "description": "One assumption moved alone, the others central: only what differs from the central schedule. Empty when that end equals the central value.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "spend": { "$ref": "#/$defs/PartialSpend" },
+        "heat_pump_spend": { "$ref": "#/$defs/Series20" },
+        "domestic_share": { "$ref": "#/$defs/DomesticShares" }
+      }
+    },
+    "Variants": {
+      "description": "Record<Assumption.id, { low: Variant; high: Variant }>.",
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/SourceId" },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["low", "high"],
+        "properties": {
+          "low": { "$ref": "#/$defs/Variant" },
+          "high": { "$ref": "#/$defs/Variant" }
+        }
+      }
+    },
     "Milestone": {
       "type": "object",
       "additionalProperties": false,
@@ -96,7 +153,8 @@
         "heat_displaced_kgco2e_per_mwh": { "$ref": "#/$defs/NonNegative" },
         "cross_border_payroll_share": { "$ref": "#/$defs/Share" },
         "milestones": { "type": "array", "items": { "$ref": "#/$defs/Milestone" } },
-        "source_ids": { "$ref": "#/$defs/SourceIds" }
+        "source_ids": { "$ref": "#/$defs/SourceIds" },
+        "variants": { "description": "Central schedule only. Every assumption that moves spend or a domestic share, at its low and at its high value while the others stay central.", "$ref": "#/$defs/Variants" }
       }
     },
     "ByScenario": {
